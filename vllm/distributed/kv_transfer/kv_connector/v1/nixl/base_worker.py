@@ -43,7 +43,7 @@ from vllm.distributed.kv_transfer.kv_connector.v1.nixl.hisparse import (
     make_hisparse_nixl_adapter,
 )
 from vllm.distributed.kv_transfer.kv_connector.v1.nixl.host_staging import (
-    HostReadStager,
+    HostWriteStager,
 )
 from vllm.distributed.kv_transfer.kv_connector.v1.nixl.metadata import (
     GET_META_MSG,
@@ -697,7 +697,7 @@ class NixlBaseConnectorWorker:
         self._failed_recv_reported: set[ReqId] = set()
         self._failed_recv_lock = threading.Lock()
         # Set when the local KV destination is host memory; see host_staging.
-        self._host_stager: HostReadStager | None = None
+        self._host_stager: HostWriteStager | None = None
         self._host_stager_init_attempted = False
 
         # Handshake metadata of this worker for NIXL transfers.
@@ -2892,7 +2892,7 @@ class NixlBaseConnectorWorker:
                     new_expiry,
                 )
 
-    def _maybe_init_host_stager(self, remote_host: str) -> HostReadStager | None:
+    def _maybe_init_host_stager(self, remote_host: str) -> HostWriteStager | None:
         """Enable device staging for same-host host-buffer reads.
 
         UCX falls back to TCP loopback for a remote-device to local-host read,
@@ -2915,7 +2915,7 @@ class NixlBaseConnectorWorker:
             [int(entry[0]) for entry in self.src_blocks_data], dtype=np.uint64
         )
         try:
-            self._host_stager = HostReadStager(
+            self._host_stager = HostWriteStager(
                 desc_lens=desc_lens,
                 host_addrs=host_addrs,
                 device=torch.device(f"cuda:{self.device_id}"),
@@ -2927,7 +2927,7 @@ class NixlBaseConnectorWorker:
             )
         except Exception:
             logger.exception(
-                "NIXL host read staging setup failed; falling back to direct "
+                "NIXL host write staging setup failed; falling back to direct "
                 "host reads (set VLLM_NIXL_HOST_STAGE_BYTES=0 to silence)"
             )
             self._host_stager = None
